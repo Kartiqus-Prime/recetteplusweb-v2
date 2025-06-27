@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -43,7 +42,18 @@ export const useSupabaseVideos = () => {
         throw error;
       }
 
-      return data as Video[];
+      // Filtrer et nettoyer les données pour gérer les erreurs de jointure
+      const cleanedData = data?.map(video => ({
+        ...video,
+        profiles: video.profiles && typeof video.profiles === 'object' && !('error' in video.profiles) 
+          ? video.profiles 
+          : null,
+        recipes: video.recipes && typeof video.recipes === 'object' && !('error' in video.recipes)
+          ? video.recipes
+          : null
+      })) || [];
+
+      return cleanedData as Video[];
     },
   });
 };
