@@ -81,30 +81,105 @@ export type Database = {
         }
         Relationships: []
       }
-      preconfigured_carts: {
+      personal_cart_items: {
         Row: {
           created_at: string
-          description: string | null
           id: string
-          is_active: boolean | null
-          items: Json
-          name: string
+          personal_cart_id: string
+          product_id: string
+          quantity: number
         }
         Insert: {
           created_at?: string
-          description?: string | null
           id?: string
-          is_active?: boolean | null
-          items: Json
-          name: string
+          personal_cart_id: string
+          product_id: string
+          quantity: number
         }
         Update: {
           created_at?: string
+          id?: string
+          personal_cart_id?: string
+          product_id?: string
+          quantity?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "personal_cart_items_personal_cart_id_fkey"
+            columns: ["personal_cart_id"]
+            isOneToOne: false
+            referencedRelation: "personal_carts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "personal_cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      personal_carts: {
+        Row: {
+          created_at: string
+          id: string
+          is_added_to_main_cart: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_added_to_main_cart?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_added_to_main_cart?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      preconfigured_carts: {
+        Row: {
+          category: string | null
+          created_at: string
+          description: string | null
+          id: string
+          image: string | null
+          is_active: boolean | null
+          is_featured: boolean | null
+          items: Json
+          name: string
+          total_price: number | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string
           description?: string | null
           id?: string
+          image?: string | null
           is_active?: boolean | null
+          is_featured?: boolean | null
+          items: Json
+          name: string
+          total_price?: number | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          image?: string | null
+          is_active?: boolean | null
+          is_featured?: boolean | null
           items?: Json
           name?: string
+          total_price?: number | null
         }
         Relationships: []
       }
@@ -198,6 +273,45 @@ export type Database = {
         }
         Relationships: []
       }
+      recipe_cart_items: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          recipe_cart_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity: number
+          recipe_cart_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          recipe_cart_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recipe_cart_items_recipe_cart_id_fkey"
+            columns: ["recipe_cart_id"]
+            isOneToOne: false
+            referencedRelation: "recipe_user_carts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipe_carts: {
         Row: {
           cart_items: string[] | null
@@ -251,6 +365,41 @@ export type Database = {
         }
         Relationships: []
       }
+      recipe_user_carts: {
+        Row: {
+          cart_name: string
+          created_at: string
+          id: string
+          is_added_to_main_cart: boolean | null
+          recipe_id: string
+          user_id: string
+        }
+        Insert: {
+          cart_name: string
+          created_at?: string
+          id?: string
+          is_added_to_main_cart?: boolean | null
+          recipe_id: string
+          user_id: string
+        }
+        Update: {
+          cart_name?: string
+          created_at?: string
+          id?: string
+          is_added_to_main_cart?: boolean | null
+          recipe_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recipe_user_carts_recipe_id_fkey"
+            columns: ["recipe_id"]
+            isOneToOne: false
+            referencedRelation: "recipes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recipes: {
         Row: {
           category: string
@@ -301,6 +450,113 @@ export type Database = {
           video_id?: string | null
         }
         Relationships: []
+      }
+      user_cart_items: {
+        Row: {
+          cart_type: string
+          created_at: string
+          id: string
+          product_id: string
+          quantity: number
+          source_cart_id: string | null
+          source_cart_name: string | null
+          unit_price: number
+          user_cart_id: string
+        }
+        Insert: {
+          cart_type: string
+          created_at?: string
+          id?: string
+          product_id: string
+          quantity: number
+          source_cart_id?: string | null
+          source_cart_name?: string | null
+          unit_price: number
+          user_cart_id: string
+        }
+        Update: {
+          cart_type?: string
+          created_at?: string
+          id?: string
+          product_id?: string
+          quantity?: number
+          source_cart_id?: string | null
+          source_cart_name?: string | null
+          unit_price?: number
+          user_cart_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_cart_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_cart_items_user_cart_id_fkey"
+            columns: ["user_cart_id"]
+            isOneToOne: false
+            referencedRelation: "user_carts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_carts: {
+        Row: {
+          created_at: string
+          id: string
+          total_price: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          total_price?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          total_price?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preconfigured_carts: {
+        Row: {
+          created_at: string
+          id: string
+          is_added_to_main_cart: boolean | null
+          preconfigured_cart_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_added_to_main_cart?: boolean | null
+          preconfigured_cart_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_added_to_main_cart?: boolean | null
+          preconfigured_cart_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_preconfigured_carts_preconfigured_cart_id_fkey"
+            columns: ["preconfigured_cart_id"]
+            isOneToOne: false
+            referencedRelation: "preconfigured_carts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       videos: {
         Row: {

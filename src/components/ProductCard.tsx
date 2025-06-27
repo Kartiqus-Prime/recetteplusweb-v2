@@ -5,8 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Heart, ShoppingCart, Star } from 'lucide-react';
 import { formatPrice } from '@/lib/firestore';
-import { useCart } from '@/hooks/useCart';
-import { useAuth } from '@/contexts/AuthContext';
+import { usePersonalCart } from '@/hooks/useSupabaseCart';
+import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useNavigate } from 'react-router-dom';
 
 interface ProductCardProps {
@@ -35,7 +35,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   inStock,
   promotion
 }) => {
-  const { addToCart, isAddingToCart } = useCart();
+  const { addToPersonalCart, isAdding } = usePersonalCart();
   const { currentUser } = useAuth();
   const navigate = useNavigate();
 
@@ -44,7 +44,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
       navigate('/login');
       return;
     }
-    addToCart({ productId: id, quantity: 1 });
+    addToPersonalCart({ productId: id, quantity: 1 });
   };
 
   return (
@@ -120,11 +120,11 @@ const ProductCard: React.FC<ProductCardProps> = ({
           
           <Button 
             onClick={handleAddToCart}
-            disabled={!inStock || isAddingToCart}
+            disabled={!inStock || isAdding}
             size="sm"
             className="bg-orange-500 hover:bg-orange-600 text-white"
           >
-            {isAddingToCart ? (
+            {isAdding ? (
               <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
             ) : (
               <>
