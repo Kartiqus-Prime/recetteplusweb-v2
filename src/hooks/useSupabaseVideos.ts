@@ -33,8 +33,8 @@ export const useSupabaseVideos = () => {
         .from('videos')
         .select(`
           *,
-          profiles!videos_created_by_fkey(display_name, email),
-          recipes!videos_recipe_id_fkey(title)
+          profiles:created_by(display_name, email),
+          recipes:recipe_id(title)
         `)
         .order('created_at', { ascending: false });
 
