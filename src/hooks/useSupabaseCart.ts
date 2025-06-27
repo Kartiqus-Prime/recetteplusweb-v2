@@ -300,11 +300,133 @@ export const useRecipeUserCarts = () => {
     },
   });
 
+  const addToMainCartMutation = useMutation({
+    mutationFn: async (recipeCartId: string) => {
+      if (!currentUser) throw new Error('User not authenticated');
+
+      // Marquer le panier recette comme ajouté
+      const { error: updateError } = await supabase
+        .from('recipe_user_carts')
+        .update({ is_added_to_main_cart: true })
+        .eq('id', recipeCartId);
+
+      if (updateError) throw updateError;
+
+      // Récupérer les informations du panier recette
+      const { data: recipeCart, error: recipeCartError } = await supabase
+        .from('recipe_user_carts')
+        .select('*')
+        .eq('id', recipeCartId)
+        .single();
+
+      if (recipeCartError) throw recipeCartError;
+
+      // Calculer le total et nombre d'items
+      const { data: itemsWithProducts, error: calcError } = await supabase
+        .from('recipe_cart_items')
+        .select(`
+          *,
+          products:product_id(price)
+        `)
+        .eq('recipe_cart_id', recipeCartId);
+
+      if (calcError) throw calcError;
+
+      const itemsCount = itemsWithProducts.length;
+      const totalPrice = itemsWithProducts.reduce((sum, item) => 
+        sum + ((item.products?.price || 0) * item.quantity), 0
+      );
+
+      // Créer ou récupérer le panier principal
+      let { data: mainCart } = await supabase
+        .from('user_carts')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (!mainCart) {
+        const { data: newCart, error: cartError } = await supabase
+          .from('user_carts')
+          .insert([{ user_id: currentUser.id }])
+          .select()
+          .single();
+
+        if (cartError) throw cartError;
+        mainCart = newCart;
+      }
+
+      // Ajouter au panier principal
+      const { error: mainCartError } = await supabase
+        .from('user_cart_items')
+        .insert([{
+          user_cart_id: mainCart.id,
+          cart_reference_type: 'recipe' as const,
+          cart_reference_id: recipeCartId,
+          cart_name: recipeCart.cart_name,
+          cart_total_price: totalPrice,
+          items_count: itemsCount,
+        }]);
+
+      if (mainCartError) throw mainCartError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipeUserCarts', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCart', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
+      toast({
+        title: "Panier ajouté",
+        description: "Le panier recette a été ajouté au panier principal",
+      });
+    },
+  });
+
+  const removeRecipeCartMutation = useMutation({
+    mutationFn: async (recipeCartId: string) => {
+      // Supprimer les items du panier recette
+      const { error: itemsError } = await supabase
+        .from('recipe_cart_items')
+        .delete()
+        .eq('recipe_cart_id', recipeCartId);
+
+      if (itemsError) throw itemsError;
+
+      // Supprimer le panier recette
+      const { error: cartError } = await supabase
+        .from('recipe_user_carts')
+        .delete()
+        .eq('id', recipeCartId);
+
+      if (cartError) throw cartError;
+
+      // Supprimer du panier principal s'il y était
+      const { error: mainCartError } = await supabase
+        .from('user_cart_items')
+        .delete()
+        .eq('cart_reference_type', 'recipe')
+        .eq('cart_reference_id', recipeCartId);
+
+      if (mainCartError) throw mainCartError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipeUserCarts', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCart', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
+      toast({
+        title: "Panier supprimé",
+        description: "Le panier recette a été supprimé",
+      });
+    },
+  });
+
   return {
     recipeCarts: recipeCartsQuery.data || [],
     isLoading: recipeCartsQuery.isLoading,
     createRecipeCart: createRecipeCartMutation.mutate,
+    addToMainCart: addToMainCartMutation.mutate,
+    removeRecipeCart: removeRecipeCartMutation.mutate,
     isCreating: createRecipeCartMutation.isPending,
+    isAddingToMain: addToMainCartMutation.isPending,
+    isRemoving: removeRecipeCartMutation.isPending,
   };
 };
 
