@@ -6,7 +6,6 @@ import { Badge } from '@/components/ui/badge';
 import { Search, SlidersHorizontal, Play, Loader2 } from 'lucide-react';
 import VideoCard from '@/components/VideoCard';
 import { useSupabaseVideos } from '@/hooks/useSupabaseVideos';
-import { getVideoThumbnail } from '@/lib/cloudinary';
 import {
   Select,
   SelectContent,
@@ -171,7 +170,7 @@ const Videos = () => {
                 <VideoCard 
                   id={video.id}
                   title={video.title}
-                  thumbnail={video.cloudinary_public_id ? getVideoThumbnail(video.cloudinary_public_id) : 'https://images.unsplash.com/photo-1516684732162-798a0062be99?w=400'}
+                  thumbnail={video.thumbnail || 'https://images.unsplash.com/photo-1516684732162-798a0062be99?w=400'}
                   duration={parseDurationToSeconds(video.duration || '0:00')}
                   views={video.views || 0}
                   category={video.category}

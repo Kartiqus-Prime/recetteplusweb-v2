@@ -31,11 +31,7 @@ export const useSupabaseVideos = () => {
       console.log('Fetching videos from Supabase...');
       const { data, error } = await supabase
         .from('videos')
-        .select(`
-          *,
-          profiles!videos_created_by_fkey(display_name, email),
-          recipes(title)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -43,11 +39,7 @@ export const useSupabaseVideos = () => {
         throw error;
       }
 
-      return data.map(video => ({
-        ...video,
-        profiles: video.profiles && !Array.isArray(video.profiles) ? video.profiles : null,
-        recipes: video.recipes && !Array.isArray(video.recipes) ? video.recipes : null
-      })) as Video[];
+      return data as Video[];
     },
   });
 };

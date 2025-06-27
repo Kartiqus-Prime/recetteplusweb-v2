@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Recipe {
@@ -31,10 +31,7 @@ export const useSupabaseRecipes = () => {
       console.log('Fetching recipes from Supabase...');
       const { data, error } = await supabase
         .from('recipes')
-        .select(`
-          *,
-          profiles!recipes_created_by_fkey(display_name, email)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -42,10 +39,7 @@ export const useSupabaseRecipes = () => {
         throw error;
       }
 
-      return data.map(recipe => ({
-        ...recipe,
-        profiles: recipe.profiles && !Array.isArray(recipe.profiles) ? recipe.profiles : null
-      })) as Recipe[];
+      return data as Recipe[];
     },
   });
 };
