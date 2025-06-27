@@ -15,17 +15,25 @@ export interface UserCart {
 export interface UserCartItem {
   id: string;
   user_cart_id: string;
+  cart_reference_type: 'personal' | 'recipe' | 'preconfigured';
+  cart_reference_id: string;
+  cart_name: string;
+  cart_total_price: number | null;
+  items_count: number | null;
+  created_at: string;
+}
+
+export interface PersonalCartItem {
+  id: string;
+  personal_cart_id: string;
   product_id: string;
   quantity: number;
-  unit_price: number;
-  cart_type: 'personal' | 'recipe' | 'preconfigured';
-  source_cart_id: string | null;
-  source_cart_name: string | null;
   created_at: string;
   products?: {
     name: string;
     image: string | null;
     category: string;
+    price: number;
   };
 }
 
@@ -36,6 +44,10 @@ export interface RecipeUserCart {
   cart_name: string;
   is_added_to_main_cart: boolean | null;
   created_at: string;
+  recipes?: {
+    title: string;
+    image: string | null;
+  };
 }
 
 export interface PersonalCart {
@@ -76,14 +88,7 @@ export const useMainCart = () => {
 
       const { data, error } = await supabase
         .from('user_cart_items')
-        .select(`
-          *,
-          products:product_id (
-            name,
-            image,
-            category
-          )
-        `)
+        .select('*')
         .eq('user_cart_id', cartQuery.data?.id || '')
         .order('created_at', { ascending: false });
 
@@ -111,23 +116,6 @@ export const useMainCart = () => {
     },
   });
 
-  const updateCartItemMutation = useMutation({
-    mutationFn: async ({ itemId, quantity }: { itemId: string; quantity: number }) => {
-      const { data, error } = await supabase
-        .from('user_cart_items')
-        .update({ quantity })
-        .eq('id', itemId)
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
-    },
-  });
-
   const removeCartItemMutation = useMutation({
     mutationFn: async (itemId: string) => {
       const { error } = await supabase
@@ -140,8 +128,8 @@ export const useMainCart = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
       toast({
-        title: "Produit supprimé",
-        description: "Le produit a été retiré de votre panier",
+        title: "Panier supprimé",
+        description: "Le panier a été retiré de votre panier principal",
       });
     },
   });
@@ -151,10 +139,8 @@ export const useMainCart = () => {
     cartItems: cartItemsQuery.data || [],
     isLoading: cartQuery.isLoading || cartItemsQuery.isLoading,
     createCart: createCartMutation.mutate,
-    updateCartItem: updateCartItemMutation.mutate,
     removeCartItem: removeCartItemMutation.mutate,
     isCreatingCart: createCartMutation.isPending,
-    isUpdating: updateCartItemMutation.isPending,
     isRemoving: removeCartItemMutation.isPending,
   };
 };
@@ -237,22 +223,37 @@ export const useRecipeUserCarts = () => {
     mutationFn: async (recipeCartId: string) => {
       if (!currentUser) throw new Error('User not authenticated');
 
-      // Récupérer les items du panier recette
+      // Récupérer les informations du panier recette
+      const { data: recipeCart, error: recipeCartError } = await supabase
+        .from('recipe_user_carts')
+        .select(`
+          *,
+          recipes:recipe_id (
+            title
+          )
+        `)
+        .eq('id', recipeCartId)
+        .single();
+
+      if (recipeCartError) throw recipeCartError;
+
+      // Compter les items et calculer le total
       const { data: recipeCartItems, error: itemsError } = await supabase
         .from('recipe_cart_items')
         .select(`
           *,
-          recipe_user_carts!inner (
-            cart_name,
-            recipe_id
-          ),
-          products (
+          products:product_id (
             price
           )
         `)
         .eq('recipe_cart_id', recipeCartId);
 
       if (itemsError) throw itemsError;
+
+      const itemsCount = recipeCartItems.length;
+      const totalPrice = recipeCartItems.reduce((sum, item) => 
+        sum + ((item.products?.price || 0) * item.quantity), 0
+      );
 
       // Créer ou récupérer le panier principal
       let { data: mainCart } = await supabase
@@ -272,20 +273,17 @@ export const useRecipeUserCarts = () => {
         mainCart = newCart;
       }
 
-      // Ajouter les items au panier principal
-      const mainCartItems = recipeCartItems.map(item => ({
-        user_cart_id: mainCart.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        unit_price: item.products?.price || 0,
-        cart_type: 'recipe' as const,
-        source_cart_id: recipeCartId,
-        source_cart_name: item.recipe_user_carts?.cart_name,
-      }));
-
+      // Ajouter le panier recette entier au panier principal
       const { error: mainCartError } = await supabase
         .from('user_cart_items')
-        .insert(mainCartItems);
+        .insert([{
+          user_cart_id: mainCart.id,
+          cart_reference_type: 'recipe' as const,
+          cart_reference_id: recipeCartId,
+          cart_name: recipeCart.cart_name,
+          cart_total_price: totalPrice,
+          items_count: itemsCount,
+        }]);
 
       if (mainCartError) throw mainCartError;
 
@@ -444,13 +442,82 @@ export const usePersonalCart = () => {
     },
   });
 
+  const addPersonalCartToMainMutation = useMutation({
+    mutationFn: async () => {
+      if (!currentUser || !personalCartQuery.data) throw new Error('No personal cart found');
+
+      const personalCart = personalCartQuery.data;
+      const personalCartItems = personalCartItemsQuery.data || [];
+
+      if (personalCartItems.length === 0) {
+        throw new Error('Le panier personnel est vide');
+      }
+
+      const itemsCount = personalCartItems.length;
+      const totalPrice = personalCartItems.reduce((sum, item) => 
+        sum + ((item.products?.price || 0) * item.quantity), 0
+      );
+
+      // Créer ou récupérer le panier principal
+      let { data: mainCart } = await supabase
+        .from('user_carts')
+        .select('*')
+        .eq('user_id', currentUser.id)
+        .single();
+
+      if (!mainCart) {
+        const { data: newCart, error: cartError } = await supabase
+          .from('user_carts')
+          .insert([{ user_id: currentUser.id }])
+          .select()
+          .single();
+
+        if (cartError) throw cartError;
+        mainCart = newCart;
+      }
+
+      // Ajouter le panier personnel entier au panier principal
+      const { error: mainCartError } = await supabase
+        .from('user_cart_items')
+        .insert([{
+          user_cart_id: mainCart.id,
+          cart_reference_type: 'personal' as const,
+          cart_reference_id: personalCart.id,
+          cart_name: 'Panier Personnel',
+          cart_total_price: totalPrice,
+          items_count: itemsCount,
+        }]);
+
+      if (mainCartError) throw mainCartError;
+
+      // Marquer le panier personnel comme ajouté
+      const { error: updateError } = await supabase
+        .from('personal_carts')
+        .update({ is_added_to_main_cart: true })
+        .eq('id', personalCart.id);
+
+      if (updateError) throw updateError;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['personalCart', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCart', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
+      toast({
+        title: "Panier ajouté",
+        description: "Votre panier personnel a été ajouté au panier principal",
+      });
+    },
+  });
+
   return {
     personalCart: personalCartQuery.data,
     personalCartItems: personalCartItemsQuery.data || [],
     isLoading: personalCartQuery.isLoading || personalCartItemsQuery.isLoading,
     createPersonalCart: createPersonalCartMutation.mutate,
     addToPersonalCart: addToPersonalCartMutation.mutate,
+    addPersonalCartToMain: addPersonalCartToMainMutation.mutate,
     isCreating: createPersonalCartMutation.isPending,
     isAdding: addToPersonalCartMutation.isPending,
+    isAddingToMain: addPersonalCartToMainMutation.isPending,
   };
 };

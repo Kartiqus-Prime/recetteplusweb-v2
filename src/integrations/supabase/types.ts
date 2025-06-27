@@ -453,46 +453,36 @@ export type Database = {
       }
       user_cart_items: {
         Row: {
-          cart_type: string
+          cart_name: string
+          cart_reference_id: string
+          cart_reference_type: string
+          cart_total_price: number | null
           created_at: string
           id: string
-          product_id: string
-          quantity: number
-          source_cart_id: string | null
-          source_cart_name: string | null
-          unit_price: number
+          items_count: number | null
           user_cart_id: string
         }
         Insert: {
-          cart_type: string
+          cart_name: string
+          cart_reference_id: string
+          cart_reference_type: string
+          cart_total_price?: number | null
           created_at?: string
           id?: string
-          product_id: string
-          quantity: number
-          source_cart_id?: string | null
-          source_cart_name?: string | null
-          unit_price: number
+          items_count?: number | null
           user_cart_id: string
         }
         Update: {
-          cart_type?: string
+          cart_name?: string
+          cart_reference_id?: string
+          cart_reference_type?: string
+          cart_total_price?: number | null
           created_at?: string
           id?: string
-          product_id?: string
-          quantity?: number
-          source_cart_id?: string | null
-          source_cart_name?: string | null
-          unit_price?: number
+          items_count?: number | null
           user_cart_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "user_cart_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
           {
             foreignKeyName: "user_cart_items_user_cart_id_fkey"
             columns: ["user_cart_id"]

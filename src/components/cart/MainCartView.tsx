@@ -4,29 +4,40 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ShoppingCart, Plus, Minus, Trash2, Package, Tag } from 'lucide-react';
+import { ShoppingCart, Trash2, Package, ChefHat, User } from 'lucide-react';
 import { useMainCart } from '@/hooks/useSupabaseCart';
 import { formatPrice } from '@/lib/firestore';
 
 const MainCartView = () => {
-  const { cart, cartItems, isLoading, updateCartItem, removeCartItem } = useMainCart();
+  const { cart, cartItems, isLoading, removeCartItem } = useMainCart();
 
-  const updateQuantity = (itemId: string, newQuantity: number) => {
-    if (newQuantity === 0) {
-      removeCartItem(itemId);
-      return;
+  const getCartTypeIcon = (type: string) => {
+    switch (type) {
+      case 'recipe':
+        return <ChefHat className="h-4 w-4" />;
+      case 'personal':
+        return <User className="h-4 w-4" />;
+      case 'preconfigured':
+        return <Package className="h-4 w-4" />;
+      default:
+        return <Package className="h-4 w-4" />;
     }
-    updateCartItem({ itemId, quantity: newQuantity });
   };
 
-  const groupedItems = cartItems.reduce((acc, item) => {
-    const key = item.cart_type;
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(item);
-    return acc;
-  }, {} as Record<string, typeof cartItems>);
+  const getCartTypeLabel = (type: string) => {
+    switch (type) {
+      case 'recipe':
+        return 'Recette';
+      case 'personal':
+        return 'Personnel';
+      case 'preconfigured':
+        return 'Préconfigurés';
+      default:
+        return 'Panier';
+    }
+  };
 
-  const subtotal = cartItems.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0);
+  const subtotal = cartItems.reduce((sum, item) => sum + (item.cart_total_price || 0), 0);
 
   if (isLoading) {
     return (
@@ -56,81 +67,39 @@ const MainCartView = () => {
         <CardHeader>
           <CardTitle className="flex items-center">
             <ShoppingCart className="h-5 w-5 mr-2" />
-            Panier Principal ({cartItems.length} articles)
+            Panier Principal ({cartItems.length} panier{cartItems.length > 1 ? 's' : ''})
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
-          {Object.entries(groupedItems).map(([cartType, items]) => (
-            <div key={cartType} className="space-y-4">
-              <div className="flex items-center space-x-2">
-                <Badge variant="outline" className="capitalize">
-                  {cartType === 'recipe' ? 'Recettes' : 
-                   cartType === 'personal' ? 'Personnel' : 'Préconfigurés'}
-                </Badge>
-                <span className="text-sm text-gray-500">
-                  {items.length} article{items.length > 1 ? 's' : ''}
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {items.map((item) => (
-                  <div key={item.id} className="flex items-center space-x-4 p-4 border rounded-lg bg-gray-50">
-                    <img 
-                      src={item.products?.image || '/placeholder.svg'} 
-                      alt={item.products?.name || ''}
-                      className="w-16 h-16 object-cover rounded-lg"
-                    />
-                    <div className="flex-1">
-                      <h3 className="font-medium">{item.products?.name}</h3>
-                      <div className="flex items-center space-x-2 mt-1">
-                        <Badge variant="outline" className="text-xs">
-                          {item.products?.category}
-                        </Badge>
-                        {item.source_cart_name && (
-                          <Badge variant="secondary" className="text-xs">
-                            <Package className="h-3 w-3 mr-1" />
-                            {item.source_cart_name}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-orange-500 font-semibold mt-1">
-                        {formatPrice(item.unit_price)}
-                      </p>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                        className="h-8 w-8"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-8 text-center">{item.quantity}</span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                        className="h-8 w-8"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => removeCartItem(item.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+        <CardContent className="space-y-4">
+          {cartItems.map((item) => (
+            <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg bg-gray-50">
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center justify-center w-12 h-12 bg-orange-100 rounded-lg">
+                  {getCartTypeIcon(item.cart_reference_type)}
+                </div>
+                <div className="flex-1">
+                  <h3 className="font-medium">{item.cart_name}</h3>
+                  <div className="flex items-center space-x-2 mt-1">
+                    <Badge variant="outline" className="text-xs">
+                      {getCartTypeLabel(item.cart_reference_type)}
+                    </Badge>
+                    <span className="text-sm text-gray-500">
+                      {item.items_count} article{(item.items_count || 0) > 1 ? 's' : ''}
+                    </span>
                   </div>
-                ))}
+                  <p className="text-orange-500 font-semibold mt-1">
+                    {formatPrice(item.cart_total_price || 0)}
+                  </p>
+                </div>
               </div>
-
-              {cartType !== Object.keys(groupedItems)[Object.keys(groupedItems).length - 1] && (
-                <Separator />
-              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => removeCartItem(item.id)}
+                className="text-red-500 hover:text-red-700"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           ))}
         </CardContent>

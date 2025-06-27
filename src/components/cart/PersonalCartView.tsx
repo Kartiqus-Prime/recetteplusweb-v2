@@ -8,7 +8,7 @@ import { usePersonalCart } from '@/hooks/useSupabaseCart';
 import { formatPrice } from '@/lib/firestore';
 
 const PersonalCartView = () => {
-  const { personalCart, personalCartItems, isLoading } = usePersonalCart();
+  const { personalCart, personalCartItems, isLoading, addPersonalCartToMain, isAddingToMain } = usePersonalCart();
 
   if (isLoading) {
     return (
@@ -106,9 +106,12 @@ const PersonalCartView = () => {
           
           <Button 
             className="w-full bg-orange-500 hover:bg-orange-600"
-            disabled={personalCart?.is_added_to_main_cart}
+            disabled={personalCart?.is_added_to_main_cart || isAddingToMain}
+            onClick={() => addPersonalCartToMain()}
           >
-            {personalCart?.is_added_to_main_cart ? (
+            {isAddingToMain ? (
+              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+            ) : personalCart?.is_added_to_main_cart ? (
               'Ajouté au panier principal'
             ) : (
               <>
