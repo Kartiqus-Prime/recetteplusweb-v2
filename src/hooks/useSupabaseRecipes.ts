@@ -49,13 +49,17 @@ export const useCreateSupabaseRecipe = () => {
   
   return useMutation({
     mutationFn: async (recipe: Omit<Recipe, 'id' | 'created_at'>) => {
+      console.log('Creating recipe:', recipe);
       const { data, error } = await supabase
         .from('recipes')
         .insert([recipe])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error creating recipe:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -69,6 +73,7 @@ export const useUpdateSupabaseRecipe = () => {
   
   return useMutation({
     mutationFn: async ({ id, ...recipe }: Partial<Recipe> & { id: string }) => {
+      console.log('Updating recipe:', id, recipe);
       const { data, error } = await supabase
         .from('recipes')
         .update(recipe)
@@ -76,7 +81,10 @@ export const useUpdateSupabaseRecipe = () => {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error updating recipe:', error);
+        throw error;
+      }
       return data;
     },
     onSuccess: () => {
@@ -90,12 +98,16 @@ export const useDeleteSupabaseRecipe = () => {
   
   return useMutation({
     mutationFn: async (id: string) => {
+      console.log('Deleting recipe:', id);
       const { error } = await supabase
         .from('recipes')
         .delete()
         .eq('id', id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error deleting recipe:', error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipes'] });

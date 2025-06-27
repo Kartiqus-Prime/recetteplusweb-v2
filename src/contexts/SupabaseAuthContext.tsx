@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -97,11 +96,39 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const logout = async () => {
     try {
+      // Vérifier d'abord si nous avons une session active
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      
+      if (!currentSession) {
+        console.log('No active session found, clearing local state');
+        setCurrentUser(null);
+        setSession(null);
+        return;
+      }
+
       const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      
+      // Même si il y a une erreur, on nettoie l'état local
+      setCurrentUser(null);
+      setSession(null);
+      
+      if (error) {
+        console.warn('Logout warning:', error);
+        // Ne pas lancer l'erreur si c'est juste une session manquante
+        if (error.message !== 'Auth session missing!') {
+          throw error;
+        }
+      }
     } catch (error: any) {
       console.error('Error during logout:', error);
-      throw error;
+      // Nettoyer l'état local même en cas d'erreur
+      setCurrentUser(null);
+      setSession(null);
+      
+      // Ne pas lancer l'erreur pour les problèmes de session manquante
+      if (error.message !== 'Auth session missing!') {
+        throw error;
+      }
     }
   };
 
@@ -173,6 +200,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.id);
         setSession(session);
         setCurrentUser(session?.user ?? null);
         setLoading(false);
@@ -181,6 +209,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('Initial session:', session?.user?.id);
       setSession(session);
       setCurrentUser(session?.user ?? null);
       setLoading(false);
