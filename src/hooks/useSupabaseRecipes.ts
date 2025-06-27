@@ -1,5 +1,6 @@
 
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Recipe {
@@ -41,7 +42,10 @@ export const useSupabaseRecipes = () => {
         throw error;
       }
 
-      return data as Recipe[];
+      return data.map(recipe => ({
+        ...recipe,
+        profiles: recipe.profiles && !Array.isArray(recipe.profiles) ? recipe.profiles : null
+      })) as Recipe[];
     },
   });
 };

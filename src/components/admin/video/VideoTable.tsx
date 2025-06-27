@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2, Eye, Play, Clock, Users, Heart } from 'lucide-react';
-import { SupabaseVideo } from '@/hooks/useSupabaseVideos';
+import { Video } from '@/hooks/useSupabaseVideos';
 
 interface AdminUser {
   uid: string;
@@ -17,9 +17,9 @@ interface AdminUser {
 }
 
 interface VideoTableProps {
-  videos: SupabaseVideo[];
+  videos: Video[];
   users: AdminUser[];
-  onEdit: (video: SupabaseVideo) => void;
+  onEdit: (video: Video) => void;
   onDelete: (id: string, title: string) => void;
   isLoading?: boolean;
 }

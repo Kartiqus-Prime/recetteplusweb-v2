@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Upload, Video as VideoIcon } from 'lucide-react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
 import { useSupabaseRecipes, Recipe } from '@/hooks/useSupabaseRecipes';
-import { uploadVideoToCloudinary } from '@/lib/cloudinary';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Video } from '@/hooks/useSupabaseVideos';
 
@@ -27,7 +28,8 @@ const VideoForm: React.FC<VideoFormProps> = ({ video, onSubmit, onCancel, isLoad
   const [formData, setFormData] = useState({
     title: video?.title || '',
     description: video?.description || '',
-    cloudinary_public_id: video?.cloudinary_public_id || '',
+    video_url: video?.video_url || '',
+    thumbnail: video?.thumbnail || '',
     duration: video?.duration || '',
     views: video?.views || 0,
     likes: video?.likes || 0,
@@ -50,24 +52,39 @@ const VideoForm: React.FC<VideoFormProps> = ({ video, onSubmit, onCancel, isLoad
     }
   };
 
+  const uploadVideoToSupabase = async (file: File): Promise<string> => {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${currentUser?.id}/${Date.now()}.${fileExt}`;
+    
+    const { data, error } = await supabase.storage
+      .from('videos')
+      .upload(fileName, file);
+
+    if (error) {
+      throw error;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('videos')
+      .getPublicUrl(data.path);
+
+    return publicUrl;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    let cloudinaryPublicId = formData.cloudinary_public_id;
+    let videoUrl = formData.video_url;
     
     // Si un nouveau fichier est sélectionné, l'uploader
     if (videoFile) {
       setUploading(true);
       try {
-        const uploadedUrl = await uploadVideoToCloudinary(videoFile);
-        // Extraire le publicId de l'URL Cloudinary
-        const urlParts = uploadedUrl.split('/');
-        const publicIdWithExtension = urlParts[urlParts.length - 1];
-        cloudinaryPublicId = publicIdWithExtension.split('.')[0];
+        videoUrl = await uploadVideoToSupabase(videoFile);
         
         toast({
           title: "Vidéo uploadée",
-          description: "La vidéo a été uploadée avec succès sur Cloudinary"
+          description: "La vidéo a été uploadée avec succès"
         });
       } catch (error) {
         toast({
@@ -83,13 +100,14 @@ const VideoForm: React.FC<VideoFormProps> = ({ video, onSubmit, onCancel, isLoad
 
     const cleanData = {
       title: formData.title.trim(),
-      description: formData.description.trim(),
-      cloudinary_public_id: cloudinaryPublicId,
-      duration: formData.duration.trim(),
+      description: formData.description.trim() || null,
+      video_url: videoUrl || null,
+      thumbnail: formData.thumbnail.trim() || null,
+      duration: formData.duration.trim() || null,
       views: Math.max(0, formData.views || 0),
       likes: Math.max(0, formData.likes || 0),
       category: formData.category.trim(),
-      recipe_id: formData.recipe_id || undefined,
+      recipe_id: formData.recipe_id || null,
       created_by: formData.created_by || currentUser?.id || ''
     };
 
@@ -130,13 +148,12 @@ const VideoForm: React.FC<VideoFormProps> = ({ video, onSubmit, onCancel, isLoad
           </div>
 
           <div>
-            <Label htmlFor="description">Description *</Label>
+            <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => setFormData({...formData, description: e.target.value})}
               rows={3}
-              required
             />
           </div>
 
@@ -158,7 +175,7 @@ const VideoForm: React.FC<VideoFormProps> = ({ video, onSubmit, onCancel, isLoad
           </div>
 
           <div>
-            <Label htmlFor="video">Fichier vidéo *</Label>
+            <Label htmlFor="video">Fichier vidéo</Label>
             <div className="mt-2">
               <div className="flex items-center justify-center w-full">
                 <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-gray-300 border-dashed rounded-lg cursor-pointer bg-gray-50 hover:bg-gray-100">
@@ -197,15 +214,24 @@ const VideoForm: React.FC<VideoFormProps> = ({ video, onSubmit, onCancel, isLoad
             </div>
           )}
 
+          <div>
+            <Label htmlFor="thumbnail">URL de la miniature (optionnel)</Label>
+            <Input
+              id="thumbnail"
+              value={formData.thumbnail}
+              onChange={(e) => setFormData({...formData, thumbnail: e.target.value})}
+              placeholder="https://example.com/thumbnail.jpg"
+            />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <Label htmlFor="duration">Durée *</Label>
+              <Label htmlFor="duration">Durée</Label>
               <Input
                 id="duration"
                 value={formData.duration}
                 onChange={(e) => setFormData({...formData, duration: e.target.value})}
                 placeholder="ex: 10:30"
-                required
               />
             </div>
             <div>
@@ -214,7 +240,7 @@ const VideoForm: React.FC<VideoFormProps> = ({ video, onSubmit, onCancel, isLoad
                 id="views"
                 type="number"
                 value={formData.views}
-                onChange={(e) => setFormData({...formData, views: parseInt(e.target.value)})}
+                onChange={(e) => setFormData({...formData, views: parseInt(e.target.value) || 0})}
               />
             </div>
             <div>
@@ -223,7 +249,7 @@ const VideoForm: React.FC<VideoFormProps> = ({ video, onSubmit, onCancel, isLoad
                 id="likes"
                 type="number"
                 value={formData.likes}
-                onChange={(e) => setFormData({...formData, likes: parseInt(e.target.value)})}
+                onChange={(e) => setFormData({...formData, likes: parseInt(e.target.value) || 0})}
               />
             </div>
           </div>

@@ -305,7 +305,6 @@ export type Database = {
       videos: {
         Row: {
           category: string
-          cloudinary_public_id: string
           created_at: string
           created_by: string
           description: string | null
@@ -315,11 +314,11 @@ export type Database = {
           recipe_id: string | null
           thumbnail: string | null
           title: string
+          video_url: string | null
           views: number | null
         }
         Insert: {
           category: string
-          cloudinary_public_id: string
           created_at?: string
           created_by: string
           description?: string | null
@@ -329,11 +328,11 @@ export type Database = {
           recipe_id?: string | null
           thumbnail?: string | null
           title: string
+          video_url?: string | null
           views?: number | null
         }
         Update: {
           category?: string
-          cloudinary_public_id?: string
           created_at?: string
           created_by?: string
           description?: string | null
@@ -343,6 +342,7 @@ export type Database = {
           recipe_id?: string | null
           thumbnail?: string | null
           title?: string
+          video_url?: string | null
           views?: number | null
         }
         Relationships: [

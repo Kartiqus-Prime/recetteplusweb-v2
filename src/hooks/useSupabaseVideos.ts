@@ -6,7 +6,7 @@ export interface Video {
   id: string;
   title: string;
   description: string | null;
-  cloudinary_public_id: string;
+  video_url: string | null;
   thumbnail: string | null;
   duration: string | null;
   views: number | null;
@@ -43,7 +43,11 @@ export const useSupabaseVideos = () => {
         throw error;
       }
 
-      return data as Video[];
+      return data.map(video => ({
+        ...video,
+        profiles: video.profiles && !Array.isArray(video.profiles) ? video.profiles : null,
+        recipes: video.recipes && !Array.isArray(video.recipes) ? video.recipes : null
+      })) as Video[];
     },
   });
 };
