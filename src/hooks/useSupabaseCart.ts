@@ -118,18 +118,48 @@ export const useMainCart = () => {
 
   const removeCartItemMutation = useMutation({
     mutationFn: async (itemId: string) => {
-      const { error } = await supabase
+      // Récupérer les informations de l'item pour supprimer le panier source
+      const { data: cartItem, error: getError } = await supabase
+        .from('user_cart_items')
+        .select('*')
+        .eq('id', itemId)
+        .single();
+
+      if (getError) throw getError;
+
+      // Supprimer l'item du panier principal
+      const { error: deleteError } = await supabase
         .from('user_cart_items')
         .delete()
         .eq('id', itemId);
 
-      if (error) throw error;
+      if (deleteError) throw deleteError;
+
+      // Supprimer le panier source selon son type
+      if (cartItem.cart_reference_type === 'personal') {
+        await supabase
+          .from('personal_carts')
+          .delete()
+          .eq('id', cartItem.cart_reference_id);
+      } else if (cartItem.cart_reference_type === 'recipe') {
+        await supabase
+          .from('recipe_user_carts')
+          .delete()
+          .eq('id', cartItem.cart_reference_id);
+      } else if (cartItem.cart_reference_type === 'preconfigured') {
+        await supabase
+          .from('user_preconfigured_carts')
+          .delete()
+          .eq('id', cartItem.cart_reference_id);
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['personalCart', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['recipeUserCarts', currentUser?.id] });
       toast({
         title: "Panier supprimé",
-        description: "Le panier a été retiré de votre panier principal",
+        description: "Le panier a été complètement supprimé",
       });
     },
   });
@@ -189,6 +219,7 @@ export const useRecipeUserCarts = () => {
           user_id: currentUser.id,
           recipe_id: recipeId,
           cart_name: cartName,
+          is_added_to_main_cart: true // Automatiquement ajouté
         }])
         .select()
         .single();
@@ -208,50 +239,19 @@ export const useRecipeUserCarts = () => {
 
       if (itemsError) throw itemsError;
 
-      return recipeCart;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipeUserCarts', currentUser?.id] });
-      toast({
-        title: "Recette ajoutée",
-        description: "La recette et ses ingrédients ont été ajoutés à vos paniers",
-      });
-    },
-  });
-
-  const addToMainCartMutation = useMutation({
-    mutationFn: async (recipeCartId: string) => {
-      if (!currentUser) throw new Error('User not authenticated');
-
-      // Récupérer les informations du panier recette
-      const { data: recipeCart, error: recipeCartError } = await supabase
-        .from('recipe_user_carts')
-        .select(`
-          *,
-          recipes:recipe_id (
-            title
-          )
-        `)
-        .eq('id', recipeCartId)
-        .single();
-
-      if (recipeCartError) throw recipeCartError;
-
-      // Compter les items et calculer le total
-      const { data: recipeCartItems, error: itemsError } = await supabase
+      // Calculer le total et nombre d'items
+      const { data: itemsWithProducts, error: calcError } = await supabase
         .from('recipe_cart_items')
         .select(`
           *,
-          products:product_id (
-            price
-          )
+          products:product_id(price)
         `)
-        .eq('recipe_cart_id', recipeCartId);
+        .eq('recipe_cart_id', recipeCart.id);
 
-      if (itemsError) throw itemsError;
+      if (calcError) throw calcError;
 
-      const itemsCount = recipeCartItems.length;
-      const totalPrice = recipeCartItems.reduce((sum, item) => 
+      const itemsCount = itemsWithProducts.length;
+      const totalPrice = itemsWithProducts.reduce((sum, item) => 
         sum + ((item.products?.price || 0) * item.quantity), 0
       );
 
@@ -273,53 +273,29 @@ export const useRecipeUserCarts = () => {
         mainCart = newCart;
       }
 
-      // Ajouter le panier recette entier au panier principal
+      // Ajouter automatiquement au panier principal
       const { error: mainCartError } = await supabase
         .from('user_cart_items')
         .insert([{
           user_cart_id: mainCart.id,
           cart_reference_type: 'recipe' as const,
-          cart_reference_id: recipeCartId,
-          cart_name: recipeCart.cart_name,
+          cart_reference_id: recipeCart.id,
+          cart_name: cartName,
           cart_total_price: totalPrice,
           items_count: itemsCount,
         }]);
 
       if (mainCartError) throw mainCartError;
 
-      // Marquer le panier recette comme ajouté
-      const { error: updateError } = await supabase
-        .from('recipe_user_carts')
-        .update({ is_added_to_main_cart: true })
-        .eq('id', recipeCartId);
-
-      if (updateError) throw updateError;
+      return recipeCart;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recipeUserCarts', currentUser?.id] });
       queryClient.invalidateQueries({ queryKey: ['mainCart', currentUser?.id] });
       queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
       toast({
-        title: "Panier ajouté",
-        description: "Le panier recette a été ajouté à votre panier principal",
-      });
-    },
-  });
-
-  const removeRecipeCartMutation = useMutation({
-    mutationFn: async (recipeCartId: string) => {
-      const { error } = await supabase
-        .from('recipe_user_carts')
-        .delete()
-        .eq('id', recipeCartId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['recipeUserCarts', currentUser?.id] });
-      toast({
-        title: "Panier supprimé",
-        description: "Le panier recette a été supprimé",
+        title: "Recette ajoutée",
+        description: "Le panier recette a été automatiquement ajouté au panier principal",
       });
     },
   });
@@ -328,11 +304,7 @@ export const useRecipeUserCarts = () => {
     recipeCarts: recipeCartsQuery.data || [],
     isLoading: recipeCartsQuery.isLoading,
     createRecipeCart: createRecipeCartMutation.mutate,
-    addToMainCart: addToMainCartMutation.mutate,
-    removeRecipeCart: removeRecipeCartMutation.mutate,
     isCreating: createRecipeCartMutation.isPending,
-    isAddingToMain: addToMainCartMutation.isPending,
-    isRemoving: removeRecipeCartMutation.isPending,
   };
 };
 
@@ -351,6 +323,7 @@ export const usePersonalCart = () => {
         .from('personal_carts')
         .select('*')
         .eq('user_id', currentUser.id)
+        .eq('is_added_to_main_cart', true)
         .single();
 
       if (error && error.code !== 'PGRST116') throw error;
@@ -384,41 +357,58 @@ export const usePersonalCart = () => {
     enabled: !!currentUser && !!personalCartQuery.data?.id,
   });
 
-  const createPersonalCartMutation = useMutation({
-    mutationFn: async () => {
-      if (!currentUser) throw new Error('User not authenticated');
-
-      const { data, error } = await supabase
-        .from('personal_carts')
-        .insert([{ user_id: currentUser.id }])
-        .select()
-        .single();
-
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['personalCart', currentUser?.id] });
-    },
-  });
-
   const addToPersonalCartMutation = useMutation({
     mutationFn: async ({ productId, quantity }: { productId: string; quantity: number }) => {
       if (!currentUser) throw new Error('User not authenticated');
 
       let personalCart = personalCartQuery.data;
 
+      // Créer un nouveau panier personnel s'il n'existe pas
       if (!personalCart) {
         const { data: newCart, error: cartError } = await supabase
           .from('personal_carts')
-          .insert([{ user_id: currentUser.id }])
+          .insert([{ 
+            user_id: currentUser.id,
+            is_added_to_main_cart: true // Automatiquement ajouté
+          }])
           .select()
           .single();
 
         if (cartError) throw cartError;
         personalCart = newCart;
+
+        // Créer ou récupérer le panier principal
+        let { data: mainCart } = await supabase
+          .from('user_carts')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .single();
+
+        if (!mainCart) {
+          const { data: newMainCart, error: mainCartError } = await supabase
+            .from('user_carts')
+            .insert([{ user_id: currentUser.id }])
+            .select()
+            .single();
+
+          if (mainCartError) throw mainCartError;
+          mainCart = newMainCart;
+        }
+
+        // Ajouter le panier personnel au panier principal
+        await supabase
+          .from('user_cart_items')
+          .insert([{
+            user_cart_id: mainCart.id,
+            cart_reference_type: 'personal' as const,
+            cart_reference_id: personalCart.id,
+            cart_name: 'Panier Personnel',
+            cart_total_price: 0,
+            items_count: 0,
+          }]);
       }
 
+      // Ajouter le produit au panier personnel
       const { data, error } = await supabase
         .from('personal_cart_items')
         .insert([{
@@ -430,81 +420,142 @@ export const usePersonalCart = () => {
         .single();
 
       if (error) throw error;
+
+      // Mettre à jour le total et le nombre d'items dans le panier principal
+      const { data: allItems, error: itemsError } = await supabase
+        .from('personal_cart_items')
+        .select(`
+          *,
+          products:product_id(price)
+        `)
+        .eq('personal_cart_id', personalCart.id);
+
+      if (itemsError) throw itemsError;
+
+      const itemsCount = allItems.length;
+      const totalPrice = allItems.reduce((sum, item) => 
+        sum + ((item.products?.price || 0) * item.quantity), 0
+      );
+
+      // Mettre à jour l'item du panier principal
+      await supabase
+        .from('user_cart_items')
+        .update({
+          cart_total_price: totalPrice,
+          items_count: itemsCount,
+        })
+        .eq('cart_reference_type', 'personal')
+        .eq('cart_reference_id', personalCart.id);
+
       return data;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['personalCart', currentUser?.id] });
       queryClient.invalidateQueries({ queryKey: ['personalCartItems', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCart', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
       toast({
         title: "Produit ajouté",
-        description: "Le produit a été ajouté à votre panier personnalisé",
+        description: "Le produit a été ajouté à votre panier personnel",
       });
     },
   });
 
-  const addPersonalCartToMainMutation = useMutation({
-    mutationFn: async () => {
-      if (!currentUser || !personalCartQuery.data) throw new Error('No personal cart found');
-
-      const personalCart = personalCartQuery.data;
-      const personalCartItems = personalCartItemsQuery.data || [];
-
-      if (personalCartItems.length === 0) {
-        throw new Error('Le panier personnel est vide');
+  const updateQuantityMutation = useMutation({
+    mutationFn: async ({ itemId, quantity }: { itemId: string; quantity: number }) => {
+      if (quantity <= 0) {
+        // Supprimer l'item
+        const { error } = await supabase
+          .from('personal_cart_items')
+          .delete()
+          .eq('id', itemId);
+        
+        if (error) throw error;
+      } else {
+        // Mettre à jour la quantité
+        const { error } = await supabase
+          .from('personal_cart_items')
+          .update({ quantity })
+          .eq('id', itemId);
+        
+        if (error) throw error;
       }
 
-      const itemsCount = personalCartItems.length;
-      const totalPrice = personalCartItems.reduce((sum, item) => 
-        sum + ((item.products?.price || 0) * item.quantity), 0
-      );
+      // Mettre à jour le total dans le panier principal
+      if (personalCartQuery.data) {
+        const { data: allItems, error: itemsError } = await supabase
+          .from('personal_cart_items')
+          .select(`
+            *,
+            products:product_id(price)
+          `)
+          .eq('personal_cart_id', personalCartQuery.data.id);
 
-      // Créer ou récupérer le panier principal
-      let { data: mainCart } = await supabase
-        .from('user_carts')
-        .select('*')
-        .eq('user_id', currentUser.id)
-        .single();
+        if (itemsError) throw itemsError;
 
-      if (!mainCart) {
-        const { data: newCart, error: cartError } = await supabase
-          .from('user_carts')
-          .insert([{ user_id: currentUser.id }])
-          .select()
-          .single();
+        const itemsCount = allItems.length;
+        const totalPrice = allItems.reduce((sum, item) => 
+          sum + ((item.products?.price || 0) * item.quantity), 0
+        );
 
-        if (cartError) throw cartError;
-        mainCart = newCart;
+        await supabase
+          .from('user_cart_items')
+          .update({
+            cart_total_price: totalPrice,
+            items_count: itemsCount,
+          })
+          .eq('cart_reference_type', 'personal')
+          .eq('cart_reference_id', personalCartQuery.data.id);
       }
-
-      // Ajouter le panier personnel entier au panier principal
-      const { error: mainCartError } = await supabase
-        .from('user_cart_items')
-        .insert([{
-          user_cart_id: mainCart.id,
-          cart_reference_type: 'personal' as const,
-          cart_reference_id: personalCart.id,
-          cart_name: 'Panier Personnel',
-          cart_total_price: totalPrice,
-          items_count: itemsCount,
-        }]);
-
-      if (mainCartError) throw mainCartError;
-
-      // Marquer le panier personnel comme ajouté
-      const { error: updateError } = await supabase
-        .from('personal_carts')
-        .update({ is_added_to_main_cart: true })
-        .eq('id', personalCart.id);
-
-      if (updateError) throw updateError;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['personalCart', currentUser?.id] });
-      queryClient.invalidateQueries({ queryKey: ['mainCart', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['personalCartItems', currentUser?.id] });
+      queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
+    },
+  });
+
+  const removeItemMutation = useMutation({
+    mutationFn: async (itemId: string) => {
+      const { error } = await supabase
+        .from('personal_cart_items')
+        .delete()
+        .eq('id', itemId);
+
+      if (error) throw error;
+
+      // Mettre à jour le total dans le panier principal
+      if (personalCartQuery.data) {
+        const { data: allItems, error: itemsError } = await supabase
+          .from('personal_cart_items')
+          .select(`
+            *,
+            products:product_id(price)
+          `)
+          .eq('personal_cart_id', personalCartQuery.data.id);
+
+        if (itemsError) throw itemsError;
+
+        const itemsCount = allItems.length;
+        const totalPrice = allItems.reduce((sum, item) => 
+          sum + ((item.products?.price || 0) * item.quantity), 0
+        );
+
+        await supabase
+          .from('user_cart_items')
+          .update({
+            cart_total_price: totalPrice,
+            items_count: itemsCount,
+          })
+          .eq('cart_reference_type', 'personal')
+          .eq('cart_reference_id', personalCartQuery.data.id);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['personalCartItems', currentUser?.id] });
       queryClient.invalidateQueries({ queryKey: ['mainCartItems', currentUser?.id] });
       toast({
-        title: "Panier ajouté",
-        description: "Votre panier personnel a été ajouté au panier principal",
+        title: "Produit supprimé",
+        description: "Le produit a été retiré de votre panier",
       });
     },
   });
@@ -513,11 +564,11 @@ export const usePersonalCart = () => {
     personalCart: personalCartQuery.data,
     personalCartItems: personalCartItemsQuery.data || [],
     isLoading: personalCartQuery.isLoading || personalCartItemsQuery.isLoading,
-    createPersonalCart: createPersonalCartMutation.mutate,
     addToPersonalCart: addToPersonalCartMutation.mutate,
-    addPersonalCartToMain: addPersonalCartToMainMutation.mutate,
-    isCreating: createPersonalCartMutation.isPending,
+    updateQuantity: updateQuantityMutation.mutate,
+    removeItem: removeItemMutation.mutate,
     isAdding: addToPersonalCartMutation.isPending,
-    isAddingToMain: addPersonalCartToMainMutation.isPending,
+    isUpdating: updateQuantityMutation.isPending,
+    isRemoving: removeItemMutation.isPending,
   };
 };

@@ -4,11 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Plus, Edit, Trash2, Star, Clock, Users, ChefHat, Video } from 'lucide-react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { Search, Plus, Edit, Trash2, Star, Clock, ChefHat } from 'lucide-react';
 import RecipeForm from '@/components/admin/RecipeForm';
 import { useSupabaseRecipes, useCreateSupabaseRecipe, useUpdateSupabaseRecipe, useDeleteSupabaseRecipe, Recipe } from '@/hooks/useSupabaseRecipes';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
@@ -19,75 +16,44 @@ const RecipeManagement = () => {
   const [editingRecipe, setEditingRecipe] = useState<Recipe | null>(null);
   const { currentUser } = useAuth();
   
-  const { data: recipes = [], isLoading: recipesLoading, refetch } = useSupabaseRecipes();
-  const createRecipeMutation = useCreateSupabaseRecipe();
-  const updateRecipeMutation = useUpdateSupabaseRecipe();
-  const deleteRecipeMutation = useDeleteSupabaseRecipe();
+  const { data: recipes = [], isLoading, refetch } = useSupabaseRecipes();
+  const createMutation = useCreateSupabaseRecipe();
+  const updateMutation = useUpdateSupabaseRecipe();
+  const deleteMutation = useDeleteSupabaseRecipe();
 
-  const filteredRecipes = recipes?.filter(recipe => 
+  const filteredRecipes = recipes.filter(recipe => 
     recipe.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     recipe.category.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  );
 
   const handleCreate = async (data: Omit<Recipe, 'id' | 'created_at'>) => {
-    try {
-      console.log('Creating recipe with data:', data);
-      if (!currentUser) {
-        throw new Error('User not authenticated');
-      }
-      
-      const recipeData = {
-        ...data,
-        created_by: currentUser.id
-      };
-      
-      await createRecipeMutation.mutateAsync(recipeData);
-      setShowForm(false);
-      refetch();
-    } catch (error) {
-      console.error('Error creating recipe:', error);
-    }
+    if (!currentUser) return;
+    
+    await createMutation.mutateAsync({
+      ...data,
+      created_by: currentUser.id
+    });
+    setShowForm(false);
+    refetch();
   };
 
   const handleUpdate = async (data: Omit<Recipe, 'id' | 'created_at'>) => {
     if (!editingRecipe) return;
     
-    try {
-      console.log('Updating recipe with data:', data);
-      await updateRecipeMutation.mutateAsync({
-        id: editingRecipe.id,
-        ...data
-      });
-      setEditingRecipe(null);
-      refetch();
-    } catch (error) {
-      console.error('Error updating recipe:', error);
-    }
+    await updateMutation.mutateAsync({
+      id: editingRecipe.id,
+      ...data
+    });
+    setEditingRecipe(null);
+    refetch();
   };
 
   const handleDelete = async (id: string, title: string) => {
-    if (window.confirm(`Êtes-vous sûr de vouloir supprimer la recette "${title}" ?`)) {
-      try {
-        await deleteRecipeMutation.mutateAsync(id);
-        refetch();
-      } catch (error) {
-        console.error('Error deleting recipe:', error);
-      }
+    if (window.confirm(`Supprimer la recette "${title}" ?`)) {
+      await deleteMutation.mutateAsync(id);
+      refetch();
     }
   };
-
-  const handleShowForm = () => {
-    console.log('Opening recipe form');
-    setShowForm(true);
-  };
-
-  const handleCloseForm = () => {
-    console.log('Closing recipe form');
-    setShowForm(false);
-  };
-
-  const isLoading = recipesLoading;
-  const isMutating = createRecipeMutation.isPending || updateRecipeMutation.isPending || deleteRecipeMutation.isPending;
 
   if (isLoading) {
     return (
@@ -99,28 +65,23 @@ const RecipeManagement = () => {
 
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 flex items-center">
             <ChefHat className="h-8 w-8 mr-3 text-orange-500" />
-            Gestion des recettes
+            Recettes ({recipes.length})
           </h1>
-          <p className="text-gray-600 mt-2">
-            Gérez toutes les recettes de votre plateforme ({recipes.length} recettes)
-          </p>
         </div>
-        <Button 
-          className="bg-orange-500 hover:bg-orange-600"
-          onClick={handleShowForm}
-        >
+        <Button onClick={() => setShowForm(true)} className="bg-orange-500 hover:bg-orange-600">
           <Plus className="h-4 w-4 mr-2" />
-          Ajouter une recette
+          Nouvelle recette
         </Button>
       </div>
 
       {/* Search */}
       <Card>
-        <CardContent className="p-6">
+        <CardContent className="p-4">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
             <Input
@@ -133,125 +94,97 @@ const RecipeManagement = () => {
         </CardContent>
       </Card>
 
-      {/* Recipes Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recettes ({filteredRecipes.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Recette</TableHead>
-                <TableHead>Catégorie</TableHead>
-                <TableHead>Difficulté</TableHead>
-                <TableHead>Temps</TableHead>
-                <TableHead>Note</TableHead>
-                <TableHead>Vidéo</TableHead>
-                <TableHead>Créée le</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRecipes.map((recipe) => (
-                <TableRow key={recipe.id}>
-                  <TableCell>
-                    <div className="flex items-center space-x-3">
-                      {recipe.image && (
-                        <img 
-                          src={recipe.image} 
-                          alt={recipe.title}
-                          className="w-12 h-12 rounded-lg object-cover"
-                        />
-                      )}
-                      <div>
-                        <p className="font-medium">{recipe.title}</p>
-                        <p className="text-sm text-gray-500">{recipe.servings} portions</p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline">{recipe.category}</Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge 
-                      variant={
-                        recipe.difficulty === 'Facile' ? 'default' :
-                        recipe.difficulty === 'Moyen' ? 'secondary' : 'destructive'
-                      }
-                    >
-                      {recipe.difficulty || 'Non définie'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-1">
-                      <Clock className="h-4 w-4 text-gray-400" />
-                      <span>{recipe.cook_time} min</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-1">
-                      <Star className="h-4 w-4 text-yellow-400 fill-current" />
-                      <span>{recipe.rating || 0}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    {recipe.video_id ? (
-                      <div className="flex items-center space-x-1 text-green-600">
-                        <Video className="h-4 w-4" />
-                        <span className="text-sm">Oui</span>
-                      </div>
-                    ) : (
-                      <span className="text-gray-400 text-sm">Non</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <span className="text-sm">
-                      {format(new Date(recipe.created_at), 'dd/MM/yyyy', { locale: fr })}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex space-x-2">
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => setEditingRecipe(recipe)}
-                        disabled={isMutating}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      <Button 
-                        variant="ghost" 
-                        size="icon"
-                        onClick={() => handleDelete(recipe.id, recipe.title)}
-                        disabled={isMutating}
-                      >
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      {/* Recipes Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredRecipes.map((recipe) => (
+          <Card key={recipe.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+            <div className="aspect-video relative">
+              <img 
+                src={recipe.image || '/placeholder.svg'} 
+                alt={recipe.title}
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute top-2 right-2">
+                <Badge variant="secondary" className="bg-white/90">
+                  {recipe.category}
+                </Badge>
+              </div>
+            </div>
+            
+            <CardContent className="p-4">
+              <h3 className="font-bold text-lg mb-2 line-clamp-2">{recipe.title}</h3>
+              
+              <div className="flex items-center justify-between text-sm text-gray-600 mb-3">
+                <div className="flex items-center space-x-1">
+                  <Clock className="h-4 w-4" />
+                  <span>{recipe.cook_time} min</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <Star className="h-4 w-4 text-yellow-400 fill-current" />
+                  <span>{recipe.rating || 0}</span>
+                </div>
+              </div>
 
-      {/* Create Form Dialog */}
+              <div className="flex items-center justify-between">
+                <Badge variant={
+                  recipe.difficulty === 'Facile' ? 'default' :
+                  recipe.difficulty === 'Moyen' ? 'secondary' : 'destructive'
+                }>
+                  {recipe.difficulty || 'Non définie'}
+                </Badge>
+                
+                <div className="flex space-x-1">
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => setEditingRecipe(recipe)}
+                  >
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button 
+                    variant="ghost" 
+                    size="icon"
+                    onClick={() => handleDelete(recipe.id, recipe.title)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {filteredRecipes.length === 0 && (
+        <Card>
+          <CardContent className="text-center py-12">
+            <ChefHat className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {searchTerm ? 'Aucune recette trouvée' : 'Aucune recette'}
+            </h3>
+            <p className="text-gray-600">
+              {searchTerm ? 'Essayez avec d\'autres mots-clés' : 'Commencez par créer votre première recette'}
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Create Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Ajouter une recette</DialogTitle>
+            <DialogTitle>Nouvelle recette</DialogTitle>
           </DialogHeader>
           <RecipeForm
             onSubmit={handleCreate}
-            onCancel={handleCloseForm}
-            isLoading={createRecipeMutation.isPending}
+            onCancel={() => setShowForm(false)}
+            isLoading={createMutation.isPending}
           />
         </DialogContent>
       </Dialog>
 
-      {/* Edit Form Dialog */}
+      {/* Edit Dialog */}
       <Dialog open={!!editingRecipe} onOpenChange={() => setEditingRecipe(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -262,7 +195,7 @@ const RecipeManagement = () => {
               recipe={editingRecipe}
               onSubmit={handleUpdate}
               onCancel={() => setEditingRecipe(null)}
-              isLoading={updateRecipeMutation.isPending}
+              isLoading={updateMutation.isPending}
             />
           )}
         </DialogContent>

@@ -3,12 +3,20 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { User, ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react';
+import { User, Plus, Minus, Trash2 } from 'lucide-react';
 import { usePersonalCart } from '@/hooks/useSupabaseCart';
 import { formatPrice } from '@/lib/firestore';
 
 const PersonalCartView = () => {
-  const { personalCart, personalCartItems, isLoading, addPersonalCartToMain, isAddingToMain } = usePersonalCart();
+  const { 
+    personalCart, 
+    personalCartItems, 
+    isLoading, 
+    updateQuantity, 
+    removeItem,
+    isUpdating,
+    isRemoving
+  } = usePersonalCart();
 
   if (isLoading) {
     return (
@@ -25,10 +33,12 @@ const PersonalCartView = () => {
           <div className="text-center">
             <User className="h-16 w-16 mx-auto text-gray-400 mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Panier personnel vide</h3>
-            <p className="text-gray-600 mb-6">Ajoutez des produits à votre panier personnalisé</p>
-            <Button className="bg-orange-500 hover:bg-orange-600">
-              Voir les produits
-            </Button>
+            <p className="text-gray-600 mb-6">
+              Ajoutez des produits depuis la page produits pour créer votre panier personnalisé
+            </p>
+            <p className="text-sm text-gray-500">
+              Les produits ajoutés seront automatiquement inclus dans votre panier principal
+            </p>
           </div>
         </CardContent>
       </Card>
@@ -39,6 +49,11 @@ const PersonalCartView = () => {
     sum + ((item.products?.price || 0) * item.quantity), 0
   );
 
+  const handleQuantityChange = (itemId: string, currentQuantity: number, increment: boolean) => {
+    const newQuantity = increment ? currentQuantity + 1 : currentQuantity - 1;
+    updateQuantity({ itemId, quantity: newQuantity });
+  };
+
   return (
     <div className="space-y-6">
       <Card>
@@ -47,6 +62,9 @@ const PersonalCartView = () => {
             <User className="h-5 w-5 mr-2" />
             Panier Personnel ({personalCartItems.length} articles)
           </CardTitle>
+          <p className="text-sm text-gray-600">
+            Automatiquement ajouté au panier principal
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           {personalCartItems.map((item) => (
@@ -70,6 +88,8 @@ const PersonalCartView = () => {
                   variant="outline"
                   size="icon"
                   className="h-8 w-8"
+                  onClick={() => handleQuantityChange(item.id, item.quantity, false)}
+                  disabled={isUpdating}
                 >
                   <Minus className="h-4 w-4" />
                 </Button>
@@ -78,6 +98,8 @@ const PersonalCartView = () => {
                   variant="outline"
                   size="icon"
                   className="h-8 w-8"
+                  onClick={() => handleQuantityChange(item.id, item.quantity, true)}
+                  disabled={isUpdating}
                 >
                   <Plus className="h-4 w-4" />
                 </Button>
@@ -86,6 +108,8 @@ const PersonalCartView = () => {
                 variant="ghost"
                 size="icon"
                 className="text-red-500 hover:text-red-700"
+                onClick={() => removeItem(item.id)}
+                disabled={isRemoving}
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
@@ -96,30 +120,16 @@ const PersonalCartView = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Actions</CardTitle>
+          <CardTitle>Résumé</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex justify-between items-center">
-            <span>Total estimé</span>
-            <span className="font-semibold">{formatPrice(subtotal)}</span>
+        <CardContent>
+          <div className="flex justify-between items-center text-lg font-semibold">
+            <span>Total</span>
+            <span className="text-orange-500">{formatPrice(subtotal)}</span>
           </div>
-          
-          <Button 
-            className="w-full bg-orange-500 hover:bg-orange-600"
-            disabled={personalCart?.is_added_to_main_cart || isAddingToMain}
-            onClick={() => addPersonalCartToMain()}
-          >
-            {isAddingToMain ? (
-              <div className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-            ) : personalCart?.is_added_to_main_cart ? (
-              'Ajouté au panier principal'
-            ) : (
-              <>
-                <ShoppingCart className="h-4 w-4 mr-2" />
-                Ajouter au panier principal
-              </>
-            )}
-          </Button>
+          <p className="text-sm text-gray-600 mt-2">
+            Ce panier est automatiquement inclus dans votre panier principal
+          </p>
         </CardContent>
       </Card>
     </div>
