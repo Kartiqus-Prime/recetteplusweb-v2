@@ -1,0 +1,106 @@
+
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+
+export interface Recipe {
+  id: string;
+  title: string;
+  description: string | null;
+  image: string | null;
+  cook_time: number;
+  servings: number;
+  difficulty: string | null;
+  rating: number | null;
+  category: string;
+  ingredients: any;
+  instructions: string[];
+  video_id: string | null;
+  created_at: string;
+  created_by: string;
+  profiles?: {
+    display_name: string | null;
+    email: string | null;
+  };
+}
+
+export const useSupabaseRecipes = () => {
+  return useQuery({
+    queryKey: ['recipes'],
+    queryFn: async () => {
+      console.log('Fetching recipes from Supabase...');
+      const { data, error } = await supabase
+        .from('recipes')
+        .select(`
+          *,
+          profiles!recipes_created_by_fkey(display_name, email)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching recipes:', error);
+        throw error;
+      }
+
+      return data as Recipe[];
+    },
+  });
+};
+
+export const useCreateSupabaseRecipe = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (recipe: Omit<Recipe, 'id' | 'created_at'>) => {
+      const { data, error } = await supabase
+        .from('recipes')
+        .insert([recipe])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    },
+  });
+};
+
+export const useUpdateSupabaseRecipe = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async ({ id, ...recipe }: Partial<Recipe> & { id: string }) => {
+      const { data, error } = await supabase
+        .from('recipes')
+        .update(recipe)
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    },
+  });
+};
+
+export const useDeleteSupabaseRecipe = () => {
+  const queryClient = useQueryClient();
+  
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from('recipes')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recipes'] });
+    },
+  });
+};
