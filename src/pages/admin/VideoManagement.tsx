@@ -1,15 +1,17 @@
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, Plus, Edit, Trash2, Video, Users, Eye, Heart, Clock, ChefHat } from 'lucide-react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
+import { Search, Plus, Video } from 'lucide-react';
 import VideoForm from '@/components/admin/VideoForm';
+import VideoTable from '@/components/admin/video/VideoTable';
+import VideoHeader from '@/components/admin/video/VideoHeader';
 import { useSupabaseVideos, useCreateSupabaseVideo, useUpdateSupabaseVideo, useDeleteSupabaseVideo, Video as VideoType } from '@/hooks/useSupabaseVideos';
+import { useCurrentUserPermissions } from '@/hooks/useAdminPermissions';
+import { useSupabaseAuthUsers } from '@/hooks/useSupabaseAuthUsers';
 
 const VideoManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -17,17 +19,25 @@ const VideoManagement = () => {
   const [editingVideo, setEditingVideo] = useState<VideoType | null>(null);
   
   const { data: videos = [], isLoading: videosLoading, refetch } = useSupabaseVideos();
+  const { data: permissions } = useCurrentUserPermissions();
+  const { data: users = [] } = useSupabaseAuthUsers();
+  
   const createVideoMutation = useCreateSupabaseVideo();
   const updateVideoMutation = useUpdateSupabaseVideo();
   const deleteVideoMutation = useDeleteSupabaseVideo();
 
+  // Vérifier les permissions
+  const canManageVideos = permissions?.can_manage_videos || permissions?.is_super_admin;
+
   const filteredVideos = videos?.filter(video => 
     video.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
     video.category.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (video as any).profiles?.display_name?.toLowerCase().includes(searchTerm.toLowerCase())
+    video.profiles?.display_name?.toLowerCase().includes(searchTerm.toLowerCase())
   ) || [];
 
   const handleCreate = async (data: Omit<VideoType, 'id' | 'created_at' | 'views' | 'likes'>) => {
+    if (!canManageVideos) return;
+    
     try {
       await createVideoMutation.mutateAsync(data);
       setShowForm(false);
@@ -38,7 +48,7 @@ const VideoManagement = () => {
   };
 
   const handleUpdate = async (data: Omit<VideoType, 'id' | 'created_at'>) => {
-    if (!editingVideo) return;
+    if (!editingVideo || !canManageVideos) return;
     
     try {
       await updateVideoMutation.mutateAsync({
@@ -53,6 +63,8 @@ const VideoManagement = () => {
   };
 
   const handleDelete = async (id: string, title: string) => {
+    if (!canManageVideos) return;
+    
     if (window.confirm(`Êtes-vous sûr de vouloir supprimer la vidéo "${title}" ?`)) {
       try {
         await deleteVideoMutation.mutateAsync(id);
@@ -66,6 +78,22 @@ const VideoManagement = () => {
   const isLoading = videosLoading;
   const isMutating = createVideoMutation.isPending || updateVideoMutation.isPending || deleteVideoMutation.isPending;
 
+  if (!canManageVideos) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <Video className="h-16 w-16 mx-auto text-gray-400 mb-4" />
+          <h3 className="text-xl font-medium text-gray-600 mb-2">
+            Accès refusé
+          </h3>
+          <p className="text-gray-500">
+            Vous n'avez pas les permissions nécessaires pour gérer les vidéos.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -76,24 +104,10 @@ const VideoManagement = () => {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center">
-            <Video className="h-8 w-8 mr-3 text-orange-500" />
-            Gestion des vidéos
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Gérez toutes les vidéos de votre plateforme ({videos.length} vidéos)
-          </p>
-        </div>
-        <Button 
-          className="bg-orange-500 hover:bg-orange-600"
-          onClick={() => setShowForm(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Ajouter une vidéo
-        </Button>
-      </div>
+      <VideoHeader 
+        onAddVideo={() => setShowForm(true)}
+        videoCount={videos.length}
+      />
 
       {/* Search */}
       <Card>
@@ -111,130 +125,13 @@ const VideoManagement = () => {
       </Card>
 
       {/* Videos Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Vidéos ({filteredVideos.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Vidéo</TableHead>
-                <TableHead>Créateur</TableHead>
-                <TableHead>Catégorie</TableHead>
-                <TableHead>Recette liée</TableHead>
-                <TableHead>Durée</TableHead>
-                <TableHead>Statistiques</TableHead>
-                <TableHead>Créée le</TableHead>
-                <TableHead>Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredVideos.map((video) => {
-                const creator = (video as any).profiles;
-                const linkedRecipe = (video as any).recipes;
-                return (
-                  <TableRow key={video.id}>
-                    <TableCell>
-                      <div className="flex items-center space-x-3">
-                        {video.thumbnail && (
-                          <img 
-                            src={video.thumbnail} 
-                            alt={video.title}
-                            className="w-16 h-12 rounded-lg object-cover"
-                          />
-                        )}
-                        <div>
-                          <p className="font-medium">{video.title}</p>
-                          <p className="text-sm text-gray-500 line-clamp-2">
-                            {video.description || 'Pas de description'}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center space-x-2">
-                        <Users className="h-4 w-4 text-gray-400" />
-                        <div>
-                          <p className="text-sm font-medium">
-                            {creator?.display_name || 'Utilisateur inconnu'}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            {creator?.email || 'Email non disponible'}
-                          </p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{video.category}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      {linkedRecipe ? (
-                        <div className="flex items-center space-x-2">
-                          <ChefHat className="h-4 w-4 text-orange-500" />
-                          <div>
-                            <p className="text-sm font-medium">{linkedRecipe.title}</p>
-                            <Badge variant="secondary" className="text-xs">Liée</Badge>
-                          </div>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-sm">Aucune recette</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {video.duration ? (
-                        <div className="flex items-center space-x-1">
-                          <Clock className="h-4 w-4 text-gray-400" />
-                          <span>{video.duration}</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400 text-sm">Non définie</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center space-x-2">
-                          <Eye className="h-4 w-4 text-blue-500" />
-                          <span className="text-sm">{video.views || 0} vues</span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <Heart className="h-4 w-4 text-red-500" />
-                          <span className="text-sm">{video.likes || 0} j'aime</span>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">
-                        {format(new Date(video.created_at), 'dd/MM/yyyy', { locale: fr })}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex space-x-2">
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => setEditingVideo(video)}
-                          disabled={isMutating}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="icon"
-                          onClick={() => handleDelete(video.id, video.title)}
-                          disabled={isMutating}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-500" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+      <VideoTable
+        videos={filteredVideos}
+        users={users}
+        onEdit={setEditingVideo}
+        onDelete={handleDelete}
+        isLoading={isMutating}
+      />
 
       {/* Create Form Dialog */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
@@ -258,7 +155,7 @@ const VideoManagement = () => {
           </DialogHeader>
           {editingVideo && (
             <VideoForm
-              video={editingVideo as any}
+              video={editingVideo}
               onSubmit={handleUpdate}
               onCancel={() => setEditingVideo(null)}
               isLoading={updateVideoMutation.isPending}

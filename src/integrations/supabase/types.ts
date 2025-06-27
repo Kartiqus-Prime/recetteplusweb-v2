@@ -9,6 +9,48 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      admin_permissions: {
+        Row: {
+          can_manage_categories: boolean | null
+          can_manage_orders: boolean | null
+          can_manage_products: boolean | null
+          can_manage_recipes: boolean | null
+          can_manage_users: boolean | null
+          can_manage_videos: boolean | null
+          created_at: string
+          id: string
+          is_super_admin: boolean | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          can_manage_categories?: boolean | null
+          can_manage_orders?: boolean | null
+          can_manage_products?: boolean | null
+          can_manage_recipes?: boolean | null
+          can_manage_users?: boolean | null
+          can_manage_videos?: boolean | null
+          created_at?: string
+          id?: string
+          is_super_admin?: boolean | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          can_manage_categories?: boolean | null
+          can_manage_orders?: boolean | null
+          can_manage_products?: boolean | null
+          can_manage_recipes?: boolean | null
+          can_manage_users?: boolean | null
+          can_manage_videos?: boolean | null
+          created_at?: string
+          id?: string
+          is_super_admin?: boolean | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       cart_items: {
         Row: {
           cart_type: string | null
@@ -78,6 +120,66 @@ export type Database = {
           item_id?: string
           type?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      manageable_product_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      manageable_recipe_categories: {
+        Row: {
+          created_at: string
+          description: string | null
+          display_order: number | null
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          display_order?: number | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -606,6 +708,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      has_admin_permission: {
+        Args: { permission_type: string }
+        Returns: boolean
+      }
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean

@@ -3,8 +3,10 @@ import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Edit, Trash2, Eye, Play, Clock, Users, Heart } from 'lucide-react';
+import { Edit, Trash2, Eye, Play, Clock, Users, Heart, ChefHat } from 'lucide-react';
 import { Video } from '@/hooks/useSupabaseVideos';
+import { format } from 'date-fns';
+import { fr } from 'date-fns/locale';
 
 interface AdminUser {
   uid: string;
@@ -31,11 +33,6 @@ const VideoTable: React.FC<VideoTableProps> = ({
   onDelete, 
   isLoading 
 }) => {
-  const getUserName = (userId: string) => {
-    const user = users.find(u => u.uid === userId);
-    return user?.displayName || user?.email || 'Utilisateur inconnu';
-  };
-
   if (videos.length === 0) {
     return (
       <Card>
@@ -53,78 +50,105 @@ const VideoTable: React.FC<VideoTableProps> = ({
   }
 
   return (
-    <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-      {videos.map((video) => (
-        <Card key={video.id} className="hover:shadow-lg transition-shadow">
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <CardTitle className="text-lg line-clamp-2">{video.title}</CardTitle>
-                <p className="text-sm text-gray-600 mt-1">
-                  Par {getUserName(video.created_by)}
-                </p>
+    <Card>
+      <CardHeader>
+        <CardTitle>Vidéos ({videos.length})</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-4">
+          {videos.map((video) => (
+            <div key={video.id} className="flex items-center space-x-4 p-4 border rounded-lg hover:bg-gray-50">
+              {/* Thumbnail */}
+              <div className="flex-shrink-0">
+                {video.thumbnail ? (
+                  <img 
+                    src={video.thumbnail} 
+                    alt={video.title}
+                    className="w-24 h-16 rounded-lg object-cover"
+                  />
+                ) : (
+                  <div className="w-24 h-16 bg-gray-200 rounded-lg flex items-center justify-center">
+                    <Play className="h-6 w-6 text-gray-400" />
+                  </div>
+                )}
               </div>
-              {video.thumbnail && (
-                <img 
-                  src={video.thumbnail} 
-                  alt={video.title}
-                  className="w-16 h-16 rounded-lg object-cover ml-3"
-                />
-              )}
-            </div>
-          </CardHeader>
-          
-          <CardContent className="space-y-4">
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline">{video.category}</Badge>
-              {video.duration && (
-                <Badge variant="secondary">
-                  <Clock className="h-3 w-3 mr-1" />
-                  {video.duration}
-                </Badge>
-              )}
-            </div>
-            
-            <div className="flex items-center justify-between text-sm text-gray-600">
-              <div className="flex items-center">
-                <Eye className="h-4 w-4 mr-1" />
-                <span>{video.views || 0} vues</span>
+
+              {/* Content */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-medium text-gray-900 line-clamp-1">
+                      {video.title}
+                    </h3>
+                    <p className="text-sm text-gray-600 line-clamp-2 mt-1">
+                      {video.description || 'Pas de description'}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2 ml-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onEdit(video)}
+                      disabled={isLoading}
+                    >
+                      <Edit className="h-4 w-4 mr-1" />
+                      Modifier
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onDelete(video.id, video.title)}
+                      disabled={isLoading}
+                      className="text-red-600 hover:text-red-700"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Supprimer
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Metadata */}
+                <div className="flex items-center space-x-4 mt-3 text-sm text-gray-500">
+                  <div className="flex items-center space-x-1">
+                    <Users className="h-4 w-4" />
+                    <span>{video.profiles?.display_name || 'Utilisateur inconnu'}</span>
+                  </div>
+                  
+                  <Badge variant="outline">{video.category}</Badge>
+                  
+                  {video.duration && (
+                    <div className="flex items-center space-x-1">
+                      <Clock className="h-4 w-4" />
+                      <span>{video.duration}</span>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center space-x-1">
+                    <Eye className="h-4 w-4" />
+                    <span>{video.views || 0} vues</span>
+                  </div>
+                  
+                  <div className="flex items-center space-x-1">
+                    <Heart className="h-4 w-4 text-red-500" />
+                    <span>{video.likes || 0} j'aime</span>
+                  </div>
+
+                  {video.recipes && (
+                    <div className="flex items-center space-x-1">
+                      <ChefHat className="h-4 w-4 text-orange-500" />
+                      <span>{video.recipes.title}</span>
+                    </div>
+                  )}
+                  
+                  <span>{format(new Date(video.created_at), 'dd/MM/yyyy', { locale: fr })}</span>
+                </div>
               </div>
-              <div className="flex items-center">
-                <Heart className="h-4 w-4 mr-1 text-red-500" />
-                <span>{video.likes || 0} likes</span>
-              </div>
             </div>
-            
-            <p className="text-sm text-gray-600 line-clamp-2">
-              {video.description}
-            </p>
-            
-            <div className="flex space-x-2 pt-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onEdit(video)}
-                disabled={isLoading}
-              >
-                <Edit className="h-4 w-4 mr-1" />
-                Modifier
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onDelete(video.id, video.title)}
-                disabled={isLoading}
-                className="text-red-600 hover:text-red-700"
-              >
-                <Trash2 className="h-4 w-4 mr-1" />
-                Supprimer
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

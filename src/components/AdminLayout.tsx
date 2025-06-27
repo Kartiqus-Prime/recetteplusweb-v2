@@ -1,11 +1,10 @@
 
 import React from 'react';
 import { useAuth } from '@/contexts/SupabaseAuthContext';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { useCurrentUserPermissions } from '@/hooks/useAdminPermissions';
 import { Navigate, Link, useLocation } from 'react-router-dom';
-import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Shield, Users, Book, Package, Video, BarChart3, ArrowLeft } from 'lucide-react';
+import { Shield, Users, Book, Package, Video, BarChart3, ArrowLeft, Settings } from 'lucide-react';
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -13,14 +12,14 @@ interface AdminLayoutProps {
 
 const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
   const { currentUser, loading: authLoading } = useAuth();
-  const { data: userProfile, isLoading: profileLoading } = useUserProfile();
+  const { data: permissions, isLoading: permissionsLoading } = useCurrentUserPermissions();
   const location = useLocation();
 
   console.log('AdminLayout - currentUser:', currentUser?.id);
-  console.log('AdminLayout - userProfile:', userProfile);
-  console.log('AdminLayout - authLoading:', authLoading, 'profileLoading:', profileLoading);
+  console.log('AdminLayout - permissions:', permissions);
+  console.log('AdminLayout - authLoading:', authLoading, 'permissionsLoading:', permissionsLoading);
 
-  if (authLoading || profileLoading) {
+  if (authLoading || permissionsLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-orange-500"></div>
@@ -33,18 +32,62 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  if (!userProfile || userProfile.role !== 'admin') {
-    console.log('AdminLayout - User is not admin, redirecting to home');
+  if (!permissions) {
+    console.log('AdminLayout - User has no admin permissions, redirecting to home');
+    return <Navigate to="/" replace />;
+  }
+
+  const hasAnyPermission = permissions.is_super_admin || 
+    permissions.can_manage_users || 
+    permissions.can_manage_products || 
+    permissions.can_manage_recipes || 
+    permissions.can_manage_videos || 
+    permissions.can_manage_categories || 
+    permissions.can_manage_orders;
+
+  if (!hasAnyPermission) {
+    console.log('AdminLayout - User has no valid permissions, redirecting to home');
     return <Navigate to="/" replace />;
   }
 
   const menuItems = [
-    { path: '/admin', icon: BarChart3, label: 'Tableau de bord' },
-    { path: '/admin/users', icon: Users, label: 'Utilisateurs' },
-    { path: '/admin/recipes', icon: Book, label: 'Recettes' },
-    { path: '/admin/products', icon: Package, label: 'Produits' },
-    { path: '/admin/videos', icon: Video, label: 'Vidéos' },
-  ];
+    { 
+      path: '/admin', 
+      icon: BarChart3, 
+      label: 'Tableau de bord',
+      show: true
+    },
+    { 
+      path: '/admin/users', 
+      icon: Users, 
+      label: 'Utilisateurs',
+      show: permissions.can_manage_users || permissions.is_super_admin
+    },
+    { 
+      path: '/admin/recipes', 
+      icon: Book, 
+      label: 'Recettes',
+      show: permissions.can_manage_recipes || permissions.is_super_admin
+    },
+    { 
+      path: '/admin/products', 
+      icon: Package, 
+      label: 'Produits',
+      show: permissions.can_manage_products || permissions.is_super_admin
+    },
+    { 
+      path: '/admin/videos', 
+      icon: Video, 
+      label: 'Vidéos',
+      show: permissions.can_manage_videos || permissions.is_super_admin
+    },
+    { 
+      path: '/admin/categories', 
+      icon: Settings, 
+      label: 'Catégories',
+      show: permissions.can_manage_categories || permissions.is_super_admin
+    },
+  ].filter(item => item.show);
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col lg:flex-row">
@@ -53,7 +96,12 @@ const AdminLayout: React.FC<AdminLayoutProps> = ({ children }) => {
         <div className="p-4 lg:p-6">
           <div className="flex items-center mb-6 lg:mb-8">
             <Shield className="h-6 w-6 lg:h-8 lg:w-8 text-orange-500 mr-2 lg:mr-3" />
-            <h1 className="text-lg lg:text-xl font-bold text-gray-900">Administration</h1>
+            <div>
+              <h1 className="text-lg lg:text-xl font-bold text-gray-900">Administration</h1>
+              {permissions.is_super_admin && (
+                <span className="text-xs text-orange-600 font-medium">Super Admin</span>
+              )}
+            </div>
           </div>
           
           <nav className="space-y-1 lg:space-y-2">

@@ -31,7 +31,11 @@ export const useSupabaseVideos = () => {
       console.log('Fetching videos from Supabase...');
       const { data, error } = await supabase
         .from('videos')
-        .select('*')
+        .select(`
+          *,
+          profiles:created_by(display_name, email),
+          recipes:recipe_id(title)
+        `)
         .order('created_at', { ascending: false });
 
       if (error) {
