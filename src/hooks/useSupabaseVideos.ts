@@ -18,10 +18,10 @@ export interface Video {
   profiles?: {
     display_name: string | null;
     email: string | null;
-  };
+  } | null;
   recipes?: {
     title: string;
-  };
+  } | null;
 }
 
 export const useSupabaseVideos = () => {
@@ -33,8 +33,8 @@ export const useSupabaseVideos = () => {
         .from('videos')
         .select(`
           *,
-          profiles:created_by(display_name, email),
-          recipes:recipe_id(title)
+          profiles!videos_created_by_fkey(display_name, email),
+          recipes!videos_recipe_id_fkey(title)
         `)
         .order('created_at', { ascending: false });
 

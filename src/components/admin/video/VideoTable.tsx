@@ -8,19 +8,19 @@ import { Video } from '@/hooks/useSupabaseVideos';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-interface AdminUser {
+interface AuthUser {
   uid: string;
   email: string;
   displayName: string;
   photoURL?: string;
-  role: string;
-  disabled: boolean;
-  emailVerified: boolean;
+  role?: string;
+  disabled?: boolean;
+  emailVerified?: boolean;
 }
 
 interface VideoTableProps {
   videos: Video[];
-  users: AdminUser[];
+  users: AuthUser[];
   onEdit: (video: Video) => void;
   onDelete: (id: string, title: string) => void;
   isLoading?: boolean;
