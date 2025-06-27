@@ -5,18 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Edit, Trash2, Eye, Play, Clock, Users, Heart, ChefHat } from 'lucide-react';
 import { Video } from '@/hooks/useSupabaseVideos';
+import { AuthUser } from '@/hooks/useSupabaseAuthUsers';
 import { format } from 'date-fns';
 import { fr } from 'date-fns/locale';
-
-interface AuthUser {
-  uid: string;
-  email: string;
-  displayName: string;
-  photoURL?: string;
-  role?: string;
-  disabled?: boolean;
-  emailVerified?: boolean;
-}
 
 interface VideoTableProps {
   videos: Video[];
